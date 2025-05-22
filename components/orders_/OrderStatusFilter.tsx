@@ -1,7 +1,8 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useTheme } from '@/hooks/useTheme';
-import { OrderStatus } from '@/context/OrderContext';
+import { useOrders } from '@/hooks/useOrders';
 
+type OrderStatus = ReturnType<typeof useOrders>['orders'][0]['status'];
 type OrderStatusFilterProps = {
   selectedStatus: OrderStatus | 'all';
   onSelectStatus: (status: OrderStatus | 'all') => void;

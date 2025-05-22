@@ -1,12 +1,12 @@
 import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity } from 'react-native';
 import { useTheme } from '@/hooks/useTheme';
-import { Order, OrderStatus } from '@/context/OrderContext';
+import { useOrders } from '@/hooks/useOrders';
 import { MapPin, Phone, Mail } from 'lucide-react-native';
 import OrderStatusSelector from './OrderStatusSelector';
 
 type OrderDetailsProps = {
-  order: Order;
-  onStatusChange: (status: OrderStatus) => void;
+  order: ReturnType<typeof useOrders>['orders'][0];
+  onStatusChange: (status: ReturnType<typeof useOrders>['orders'][0]['status']) => void;
 };
 
 export default function OrderDetails({ order, onStatusChange }: OrderDetailsProps) {
@@ -23,6 +23,10 @@ export default function OrderDetails({ order, onStatusChange }: OrderDetailsProp
       minute: '2-digit'
     });
   };
+
+  const formatPrice = (price: number | undefined) => {
+    return (price || 0).toFixed(2);
+  };
   
   return (
     <View style={styles.container}>
@@ -36,7 +40,7 @@ export default function OrderDetails({ order, onStatusChange }: OrderDetailsProp
         
         <View style={styles.infoRow}>
           <Text style={[styles.infoLabel, { color: colors.textLight }]}>Date:</Text>
-          <Text style={[styles.infoValue, { color: colors.text }]}>{formatDate(order.createdAt)}</Text>
+          <Text style={[styles.infoValue, { color: colors.text }]}>{formatDate(order.date)}</Text>
         </View>
         
         <View style={styles.infoRow}>
@@ -55,13 +59,6 @@ export default function OrderDetails({ order, onStatusChange }: OrderDetailsProp
           <Text style={[styles.infoLabel, { color: colors.textLight }]}>Name:</Text>
           <Text style={[styles.infoValue, { color: colors.text }]}>{order.customerName}</Text>
         </View>
-        
-        {order.customerPhone && (
-          <View style={styles.contactRow}>
-            <Phone size={16} color={colors.primary} />
-            <Text style={[styles.contactText, { color: colors.text }]}>{order.customerPhone}</Text>
-          </View>
-        )}
         
         <View style={styles.contactRow}>
           <Mail size={16} color={colors.primary} />
@@ -84,14 +81,14 @@ export default function OrderDetails({ order, onStatusChange }: OrderDetailsProp
             )}
             
             <View style={styles.itemInfo}>
-              <Text style={[styles.itemName, { color: colors.text }]}>{item.productName}</Text>
+              <Text style={[styles.itemName, { color: colors.text }]}>{item.name}</Text>
               <Text style={[styles.itemPrice, { color: colors.textLight }]}>
-                ${item.unitPrice.toFixed(2)} × {item.quantity}
+                ${formatPrice(item.unitPrice)} × {item.quantity}
               </Text>
             </View>
             
             <Text style={[styles.itemTotal, { color: colors.primary }]}>
-              ${item.totalPrice.toFixed(2)}
+              ${formatPrice(item.totalPrice)}
             </Text>
           </View>
         ))}
@@ -100,7 +97,7 @@ export default function OrderDetails({ order, onStatusChange }: OrderDetailsProp
           <View style={styles.totalRow}>
             <Text style={[styles.totalLabel, { color: colors.textLight }]}>Subtotal:</Text>
             <Text style={[styles.totalValue, { color: colors.text }]}>
-              ${order.totalAmount.toFixed(2)}
+              ${formatPrice(order.totalAmount)}
             </Text>
           </View>
           
@@ -112,7 +109,7 @@ export default function OrderDetails({ order, onStatusChange }: OrderDetailsProp
           <View style={styles.totalRow}>
             <Text style={[styles.grandTotalLabel, { color: colors.text }]}>Total:</Text>
             <Text style={[styles.grandTotalValue, { color: colors.primary }]}>
-              ${order.totalAmount.toFixed(2)}
+              ${formatPrice(order.totalAmount)}
             </Text>
           </View>
         </View>
