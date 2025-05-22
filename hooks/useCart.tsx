@@ -1,6 +1,10 @@
 import { createContext, ReactNode, useContext, useState, useEffect } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
+import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
+import { db } from '@/firebase/firebase';
+import { useAuth } from './useAuth';
+import { FirebaseErrorHandler } from '@/utils/errorHandling';
 
 interface CartItem {
   id: string;
@@ -17,6 +21,8 @@ interface CartContextType {
   removeItem: (itemId: string, variant?: string) => void;
   updateItemQuantity: (itemId: string, quantity: number, variant?: string) => void;
   clearCart: () => void;
+  isLoading: boolean;
+  error: string | null;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -47,75 +53,124 @@ const storage = {
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
 
-  // Load cart from storage on mount
+  // Load cart from Firestore when user changes
   useEffect(() => {
-    const loadCart = async () => {
-      try {
-        const cartJSON = await storage.getItem('cart');
-        if (cartJSON) {
-          setItems(JSON.parse(cartJSON));
+    if (!user) {
+      setItems([]);
+      setIsLoading(false);
+      return;
+    }
+
+    const cartRef = doc(db, 'carts', user.id);
+    
+    // Set up real-time listener for cart changes
+    const unsubscribe = onSnapshot(
+      cartRef,
+      (doc) => {
+        if (doc.exists()) {
+          const cartData = doc.data();
+          setItems(cartData.items || []);
+        } else {
+          setItems([]);
         }
-      } catch (error) {
+        setIsLoading(false);
+      },
+      (error) => {
         console.error('Error loading cart:', error);
+        setError(FirebaseErrorHandler.handleError(error));
+        setIsLoading(false);
       }
-    };
-
-    loadCart();
-  }, []);
-
-  // Save cart to storage whenever it changes
-  useEffect(() => {
-    const saveCart = async () => {
-      try {
-        await storage.setItem('cart', JSON.stringify(items));
-      } catch (error) {
-        console.error('Error saving cart:', error);
-      }
-    };
-
-    saveCart();
-  }, [items]);
-
-  const addItem = (newItem: CartItem) => {
-    setItems(prevItems => {
-      // Check if item already exists in cart, including the variant if present
-      const existingItemIndex = prevItems.findIndex(
-        item => item.id === newItem.id && item.selectedVariant === newItem.selectedVariant
-      );
-
-      if (existingItemIndex >= 0) {
-        // Update quantity of existing item
-        const updatedItems = [...prevItems];
-        updatedItems[existingItemIndex].quantity += newItem.quantity;
-        return updatedItems;
-      } else {
-        // Add new item to cart
-        return [...prevItems, newItem];
-      }
-    });
-  };
-
-  const removeItem = (itemId: string, variant?: string) => {
-    setItems(prevItems => 
-      prevItems.filter(item => 
-        !(item.id === itemId && item.selectedVariant === variant)
-      )
     );
+
+    return () => unsubscribe();
+  }, [user]);
+
+  const saveCartToFirestore = async (newItems: CartItem[]) => {
+    if (!user) return;
+
+    try {
+      const cartRef = doc(db, 'carts', user.id);
+      await setDoc(cartRef, { items: newItems }, { merge: true });
+    } catch (error) {
+      console.error('Error saving cart:', error);
+      setError(FirebaseErrorHandler.handleError(error));
+    }
   };
 
-  const updateItemQuantity = (itemId: string, quantity: number, variant?: string) => {
-    setItems(prevItems => 
-      prevItems.map(item => 
-        item.id === itemId && item.selectedVariant === variant
-          ? { ...item, quantity }
-          : item
-      )
-    );
+  const addItem = async (newItem: CartItem) => {
+    try {
+      setItems(prevItems => {
+        const existingItemIndex = prevItems.findIndex(
+          item => item.id === newItem.id && item.selectedVariant === newItem.selectedVariant
+        );
+
+        let newItems;
+        if (existingItemIndex >= 0) {
+          newItems = [...prevItems];
+          newItems[existingItemIndex].quantity += newItem.quantity;
+        } else {
+          newItems = [...prevItems, newItem];
+        }
+
+        // Save to Firestore
+        saveCartToFirestore(newItems);
+        return newItems;
+      });
+    } catch (error) {
+      console.error('Error adding item to cart:', error);
+      setError(FirebaseErrorHandler.handleError(error));
+    }
   };
 
-  const clearCart = () => {
-    setItems([]);
+  const removeItem = async (itemId: string, variant?: string) => {
+    try {
+      setItems(prevItems => {
+        const newItems = prevItems.filter(item => 
+          !(item.id === itemId && item.selectedVariant === variant)
+        );
+        // Save to Firestore
+        saveCartToFirestore(newItems);
+        return newItems;
+      });
+    } catch (error) {
+      console.error('Error removing item from cart:', error);
+      setError(FirebaseErrorHandler.handleError(error));
+    }
+  };
+
+  const updateItemQuantity = async (itemId: string, quantity: number, variant?: string) => {
+    try {
+      setItems(prevItems => {
+        const newItems = prevItems.map(item => 
+          item.id === itemId && item.selectedVariant === variant
+            ? { ...item, quantity }
+            : item
+        );
+        // Save to Firestore
+        saveCartToFirestore(newItems);
+        return newItems;
+      });
+    } catch (error) {
+      console.error('Error updating item quantity:', error);
+      setError(FirebaseErrorHandler.handleError(error));
+    }
+  };
+
+  const clearCart = async () => {
+    try {
+      setItems([]);
+      if (user) {
+        const cartRef = doc(db, 'carts', user.id);
+        await setDoc(cartRef, { items: [] });
+      }
+    } catch (error) {
+      console.error('Error clearing cart:', error);
+      setError(FirebaseErrorHandler.handleError(error));
+    }
   };
 
   return (
@@ -126,6 +181,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
         removeItem,
         updateItemQuantity,
         clearCart,
+        isLoading,
+        error
       }}
     >
       {children}

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
@@ -11,13 +11,18 @@ import { CartProvider } from '@/hooks/useCart';
 import { OrdersProvider } from '@/hooks/useOrders';
 import { ProductProvider } from '@/context/ProductContext';
 import { StatsProvider } from '@/context/StatsContext';
-import {OrderProvider} from '@/context/OrderContext';
+import { OrderProvider } from '@/context/OrderContext';
 import { AuthProviders } from '@/context/AuthContext';
+import { getApps, initializeApp } from 'firebase/app';
+import { firebaseConfig } from '@/firebase/firebase';
+import { FirebaseErrorHandler } from '@/utils/errorHandling';
+
 // Prevent splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   useFrameworkReady();
+  const [firebaseInitialized, setFirebaseInitialized] = useState(false);
 
   const [fontsLoaded, fontError] = useFonts({
     'Inter-Regular': Inter_400Regular,
@@ -28,15 +33,27 @@ export default function RootLayout() {
     'Poppins-SemiBold': Poppins_600SemiBold,
   });
 
-  // Hide splash screen once fonts are loaded
+  // Initialize Firebase
   useEffect(() => {
-    if (fontsLoaded || fontError) {
+    try {
+      if (getApps().length === 0) {
+        initializeApp(firebaseConfig);
+      }
+      setFirebaseInitialized(true);
+    } catch (error) {
+      console.error('Firebase initialization error:', FirebaseErrorHandler.handleError(error));
+    }
+  }, []);
+
+  // Hide splash screen once fonts are loaded and Firebase is initialized
+  useEffect(() => {
+    if ((fontsLoaded || fontError) && firebaseInitialized) {
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded, fontError]);
+  }, [fontsLoaded, fontError, firebaseInitialized]);
 
-  // Return null to keep splash screen visible while fonts load
-  if (!fontsLoaded && !fontError) {
+  // Return null to keep splash screen visible while fonts load and Firebase initializes
+  if (!fontsLoaded && !fontError || !firebaseInitialized) {
     return null;
   }
 
@@ -44,36 +61,35 @@ export default function RootLayout() {
     <AuthProvider>
       <ProductProvider>
         <AuthProviders>
-        <OrderProvider>
-        <StatsProvider>
-       
-          <CartProvider>
-            <OrdersProvider>
-              <Stack screenOptions={{ headerShown: false }}>
-                {/* Authentication flow */}
-                <Stack.Screen name="(auth)" options={{ animation: 'fade' }} />
-                
-                {/* Main customer tab navigator */}
-                <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
-                
-                {/* Admin/Seller tab navigator */}
-                <Stack.Screen name="(tabs_)" options={{ animation: 'fade' }} />
-                
-                {/* Product details modal */}
-                <Stack.Screen name="(product)" options={{ presentation: 'card' }} />
-                
-                {/* Standalone routes */}
-                <Stack.Screen name="products_" options={{ headerShown: false }} />
-                <Stack.Screen name="orders" options={{ headerShown: false }} />
-                
-                {/* Error handling */}
-                <Stack.Screen name="+not-found" />
-              </Stack>
-              <StatusBar style="auto" />
-            </OrdersProvider>
-          </CartProvider>
-        </StatsProvider>
-        </OrderProvider>
+          <OrderProvider>
+            <StatsProvider>
+              <CartProvider>
+                <OrdersProvider>
+                  <Stack screenOptions={{ headerShown: false }}>
+                    {/* Authentication flow */}
+                    <Stack.Screen name="(auth)" options={{ animation: 'fade' }} />
+                    
+                    {/* Main customer tab navigator */}
+                    <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
+                    
+                    {/* Admin/Seller tab navigator */}
+                    <Stack.Screen name="(tabs_)" options={{ animation: 'fade' }} />
+                    
+                    {/* Product details modal */}
+                    <Stack.Screen name="(product)" options={{ presentation: 'card' }} />
+                    
+                    {/* Standalone routes */}
+                    <Stack.Screen name="products_" options={{ headerShown: false }} />
+                    <Stack.Screen name="orders" options={{ headerShown: false }} />
+                    
+                    {/* Error handling */}
+                    <Stack.Screen name="+not-found" />
+                  </Stack>
+                  <StatusBar style="auto" />
+                </OrdersProvider>
+              </CartProvider>
+            </StatsProvider>
+          </OrderProvider>
         </AuthProviders>
       </ProductProvider>
     </AuthProvider>

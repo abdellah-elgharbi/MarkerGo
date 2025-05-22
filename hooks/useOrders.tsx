@@ -1,6 +1,10 @@
 import { createContext, ReactNode, useContext, useState, useEffect } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
+import { collection, doc, setDoc, addDoc, onSnapshot, query, where, orderBy, serverTimestamp } from 'firebase/firestore';
+import { db } from '@/firebase/firebase';
+import { useAuth } from './useAuth';
+import { FirebaseErrorHandler } from '@/utils/errorHandling';
 
 interface OrderItem {
   id: string;
@@ -9,6 +13,8 @@ interface OrderItem {
   quantity: number;
   image: string;
   selectedVariant?: string;
+  unitPrice?: number;
+  totalPrice?: number;
 }
 
 interface Order {
@@ -17,12 +23,18 @@ interface Order {
   totalAmount: number;
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   date: string;
+  customerId: string;
+  customerName: string;
+  customerEmail: string;
+  shippingAddress: string;
 }
 
 interface OrdersContextType {
   orders: Order[];
-  addOrder: (order: Order) => void;
-  updateOrderStatus: (orderId: string, status: Order['status']) => void;
+  addOrder: (order: Omit<Order, 'id' | 'date'>) => Promise<void>;
+  updateOrderStatus: (orderId: string, status: Order['status']) => Promise<void>;
+  isLoading: boolean;
+  error: string | null;
 }
 
 const OrdersContext = createContext<OrdersContextType | undefined>(undefined);
@@ -51,50 +63,126 @@ const storage = {
   }
 };
 
+// Helper function to ensure order items have all required price fields
+const ensureOrderItemFields = (item: OrderItem): OrderItem => {
+  const unitPrice = item.unitPrice || item.price || 0;
+  const quantity = item.quantity || 1;
+  return {
+    ...item,
+    price: item.price || unitPrice,
+    unitPrice,
+    totalPrice: unitPrice * quantity,
+    quantity
+  };
+};
+
+// Helper function to ensure order has all required fields
+const ensureOrderFields = (order: any): Order => {
+  const items = (order.items || []).map(ensureOrderItemFields);
+  const totalAmount = items.reduce((sum: number, item: OrderItem) => sum + (item.totalPrice || 0), 0);
+  
+  return {
+    id: order.id || '',
+    items,
+    totalAmount: order.totalAmount || totalAmount,
+    status: order.status || 'pending',
+    date: order.date || new Date().toISOString(),
+    customerId: order.customerId || '',
+    customerName: order.customerName || 'Unknown Customer',
+    customerEmail: order.customerEmail || '',
+    shippingAddress: order.shippingAddress || ''
+  };
+};
+
 export function OrdersProvider({ children }: { children: ReactNode }) {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
 
-  // Load orders from storage on mount
+  // Load orders from Firestore when user changes
   useEffect(() => {
-    const loadOrders = async () => {
-      try {
-        const ordersJSON = await storage.getItem('orders');
-        if (ordersJSON) {
-          setOrders(JSON.parse(ordersJSON));
-        }
-      } catch (error) {
+    if (!user) {
+      setOrders([]);
+      setIsLoading(false);
+      return;
+    }
+
+    const ordersRef = collection(db, 'orders');
+    const ordersQuery = query(
+      ordersRef,
+      where('customerId', '==', user.id),
+      orderBy('date', 'desc')
+    );
+    
+    // Set up real-time listener for orders
+    const unsubscribe = onSnapshot(
+      ordersQuery,
+      (snapshot) => {
+        const ordersData = snapshot.docs.map(doc => ensureOrderFields({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setOrders(ordersData);
+        setIsLoading(false);
+      },
+      (error) => {
         console.error('Error loading orders:', error);
+        setError(FirebaseErrorHandler.handleError(error));
+        setIsLoading(false);
       }
-    };
+    );
 
-    loadOrders();
-  }, []);
+    return () => unsubscribe();
+  }, [user]);
 
-  // Save orders to storage whenever it changes
-  useEffect(() => {
-    const saveOrders = async () => {
-      try {
-        await storage.setItem('orders', JSON.stringify(orders));
-      } catch (error) {
-        console.error('Error saving orders:', error);
+  const addOrder = async (orderData: Omit<Order, 'id' | 'date'>) => {
+    try {
+      if (!user) {
+        throw new Error('User must be logged in to place an order');
       }
-    };
 
-    saveOrders();
-  }, [orders]);
+      const ordersRef = collection(db, 'orders');
+      const newOrder = ensureOrderFields({
+        ...orderData,
+        date: new Date().toISOString(),
+        customerId: user.id,
+        customerName: user.name,
+        customerEmail: user.email
+      });
 
-  const addOrder = (newOrder: Order) => {
-    setOrders(prevOrders => [newOrder, ...prevOrders]);
+      const docRef = await addDoc(ordersRef, newOrder);
+      
+      // Update local state
+      setOrders(prevOrders => [{
+        ...newOrder,
+        id: docRef.id
+      }, ...prevOrders]);
+    } catch (error) {
+      console.error('Error adding order:', error);
+      setError(FirebaseErrorHandler.handleError(error));
+      throw error;
+    }
   };
 
-  const updateOrderStatus = (orderId: string, status: Order['status']) => {
-    setOrders(prevOrders => 
-      prevOrders.map(order => 
-        order.id === orderId
-          ? { ...order, status }
-          : order
-      )
-    );
+  const updateOrderStatus = async (orderId: string, status: Order['status']) => {
+    try {
+      const orderRef = doc(db, 'orders', orderId);
+      await setDoc(orderRef, { status }, { merge: true });
+      
+      // Update local state
+      setOrders(prevOrders => 
+        prevOrders.map(order => 
+          order.id === orderId
+            ? { ...order, status }
+            : order
+        )
+      );
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      setError(FirebaseErrorHandler.handleError(error));
+      throw error;
+    }
   };
 
   return (
@@ -103,6 +191,8 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
         orders,
         addOrder,
         updateOrderStatus,
+        isLoading,
+        error
       }}
     >
       {children}

@@ -2,7 +2,24 @@ import { createContext, ReactNode, useContext, useState, useEffect } from 'react
 import * as SecureStore from 'expo-secure-store';
 import { router } from 'expo-router';
 import { Platform } from 'react-native';
-import { MOCK_USER } from '@/data/mockData';
+import { 
+  getAuth, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword,
+  signOut,
+  updatePassword,
+  onAuthStateChanged,
+  User as FirebaseUser
+} from 'firebase/auth';
+import { 
+  doc, 
+  setDoc, 
+  getDoc, 
+  updateDoc,
+  collection
+} from 'firebase/firestore';
+import { db } from '@/firebase/firebase';
+import { FirebaseErrorHandler } from '@/utils/errorHandling';
 
 // Ajout du type d'utilisateur à l'interface User
 export interface User {
@@ -62,70 +79,56 @@ const storage = {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const auth = getAuth();
 
-  // Check for existing session on startup
+  // Listen for auth state changes
   useEffect(() => {
-    const loadUserSession = async () => {
-      try {
-        const userJSON = await storage.getItem('user');
-        if (userJSON) {
-          setUser(JSON.parse(userJSON));
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        // Get user data from Firestore
+        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data() as User;
+          setUser(userData);
+          await storage.setItem('user', JSON.stringify(userData));
         }
-      } catch (error) {
-        console.error('Error loading user session:', error);
-      } finally {
-        setIsLoading(false);
+      } else {
+        setUser(null);
+        await storage.removeItem('user');
       }
-    };
+      setIsLoading(false);
+    });
 
-    loadUserSession();
+    return () => unsubscribe();
   }, []);
 
   const login = async (email: string, password: string) => {
     try {
       setIsLoading(true);
       
-      // Basic validation
       if (!email || !password) {
         throw new Error('Please enter both email and password');
       }
+
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
       
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // In a real app, validate against backend
-      // For demo purposes, we'll accept a demo login or any login like the original implementation
-      let authenticatedUser: User;
-      
-      if (email === 'demo@example.com' && password === 'password') {
-        authenticatedUser = { 
-          ...MOCK_USER, 
-          email,
-          userType: 'client' // Default type for demo user
-        };
-      } else {
-        // Default mock user (from first implementation)
-        authenticatedUser = {
-          id: '1',
-          name: 'John Doe',
-          email: email,
-          userType: 'client' // Default type
-        };
+      if (!userDoc.exists()) {
+        throw new Error('User data not found');
       }
 
-      // Save user to storage
-      await storage.setItem('user', JSON.stringify(authenticatedUser));
-      setUser(authenticatedUser);
+      const userData = userDoc.data() as User;
+      setUser(userData);
       
-      // Navigation adaptative selon le type d'utilisateur
-      if (authenticatedUser.userType === 'client') {
+      // Navigate based on user type
+      if (userData.userType === 'client') {
         router.replace('/(tabs)');
       } else {
         router.replace('/(tabs_)');
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Login error:', error);
-      throw new Error(error.message || 'Login failed');
+      throw new Error(FirebaseErrorHandler.handleError(error));
     } finally {
       setIsLoading(false);
     }
@@ -141,87 +144,89 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setIsLoading(true);
       
-      // Basic validation
       if (!userData.email || !userData.password || !userData.name) {
         throw new Error('Please fill in all required fields');
       }
       
-      // Validation spécifique au type d'utilisateur
       if (userData.userType === 'seller' && !userData.storeName) {
         throw new Error('Store name is required for sellers');
       }
-      
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Create new user combining approaches from both implementations
+
+      // Create user in Firebase Auth
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        userData.email,
+        userData.password
+      );
+
+      // Create user document in Firestore
       const newUser: User = {
-        id: `user_${Date.now()}`,
+        id: userCredential.user.uid,
         name: userData.name,
         email: userData.email,
         storeName: userData.storeName || '',
         userType: userData.userType
       };
 
-      // Save user to storage
-      await storage.setItem('user', JSON.stringify(newUser));
+      await setDoc(doc(db, 'users', userCredential.user.uid), newUser);
       setUser(newUser);
       
-      // Navigation adaptative selon le type d'utilisateur
+      // Navigate based on user type
       if (userData.userType === 'client') {
         router.replace('/(tabs)');
       } else {
         router.replace('/(tabs_)');
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Registration error:', error);
-      throw new Error(error.message || 'Registration failed');
+      throw new Error(FirebaseErrorHandler.handleError(error));
     } finally {
       setIsLoading(false);
     }
   };
 
- const logout = async () => {
-  console.log("ff")
-  try {
-    // Remove user from storage
-    await storage.removeItem('user');
-    setUser(null);
-    
-    // Correction du chemin de navigation
-    router.replace('/(auth)/login');
-  } catch (error) {
-    console.error('Logout error:', error);
-  }
-};
+  const logout = async () => {
+    try {
+      await signOut(auth);
+      setUser(null);
+      await storage.removeItem('user');
+      router.replace('/(auth)/login');
+    } catch (error) {
+      console.error('Logout error:', error);
+      throw new Error(FirebaseErrorHandler.handleError(error));
+    }
+  };
 
   const updateUserProfile = async (userData: Partial<User>) => {
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      if (user) {
-        const updatedUser = { ...user, ...userData };
-        await storage.setItem('user', JSON.stringify(updatedUser));
-        setUser(updatedUser);
+      if (!user) {
+        throw new Error('No user logged in');
       }
+
+      const userRef = doc(db, 'users', user.id);
+      await updateDoc(userRef, userData);
+      
+      const updatedUser = { ...user, ...userData };
+      setUser(updatedUser);
+      await storage.setItem('user', JSON.stringify(updatedUser));
     } catch (error) {
       console.error('Update profile error:', error);
-      throw error;
+      throw new Error(FirebaseErrorHandler.handleError(error));
     }
   };
 
   const changePassword = async (oldPassword: string, newPassword: string) => {
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // In a real app, this would send the old and new passwords to the API
-      // For mock purposes, we'll just pretend it succeeded
-      console.log('Password changed successfully');
+      if (!auth.currentUser) {
+        throw new Error('No user logged in');
+      }
+
+      // Reauthenticate user before changing password
+      await signInWithEmailAndPassword(auth, user?.email || '', oldPassword);
+      await updatePassword(auth.currentUser, newPassword);
     } catch (error) {
       console.error('Change password error:', error);
-      throw error;
+      throw new Error(FirebaseErrorHandler.handleError(error));
     }
   };
 
