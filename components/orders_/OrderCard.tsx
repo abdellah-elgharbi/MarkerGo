@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useTheme } from '@/hooks/useTheme';
 import { ChevronRight } from 'lucide-react-native';
 import { Order, OrderStatus } from '@/context/OrderContext';
@@ -7,9 +7,10 @@ import { useRouter } from 'expo-router';
 type OrderCardProps = {
   order: Order;
   onStatusChange: (status: OrderStatus) => void;
+  isUpdating?: boolean;
 };
 
-export default function OrderCard({ order, onStatusChange }: OrderCardProps) {
+export default function OrderCard({ order, onStatusChange, isUpdating }: OrderCardProps) {
   const { colors } = useTheme();
   const router = useRouter();
   
@@ -40,13 +41,20 @@ export default function OrderCard({ order, onStatusChange }: OrderCardProps) {
   };
   
   const handlePress = () => {
-    router.push(`/orders/${order.id}`);
+    if (!isUpdating) {
+      router.push(`/orders/${order.id}`);
+    }
   };
   
   return (
     <TouchableOpacity 
-      style={[styles.container, { backgroundColor: colors.card, borderColor: colors.border }]}
+      style={[
+        styles.container, 
+        { backgroundColor: colors.card, borderColor: colors.border },
+        isUpdating && styles.updating
+      ]}
       onPress={handlePress}
+      disabled={isUpdating}
     >
       <View style={styles.header}>
         <View>
@@ -59,9 +67,13 @@ export default function OrderCard({ order, onStatusChange }: OrderCardProps) {
         </View>
         
         <View style={[styles.statusContainer, { backgroundColor: getStatusColor(order.status) + '20' }]}>
-          <Text style={[styles.status, { color: getStatusColor(order.status) }]}>
-            {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-          </Text>
+          {isUpdating ? (
+            <ActivityIndicator size="small" color={getStatusColor(order.status)} />
+          ) : (
+            <Text style={[styles.status, { color: getStatusColor(order.status) }]}>
+              {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+            </Text>
+          )}
         </View>
       </View>
       
@@ -91,6 +103,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
   },
+  updating: {
+    opacity: 0.7,
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -110,6 +125,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 16,
+    minWidth: 80,
+    alignItems: 'center',
   },
   status: {
     fontSize: 14,

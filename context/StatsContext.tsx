@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { MOCK_SALES_DATA, MOCK_TOP_PRODUCTS, MOCK_SUMMARY } from '@/data/mockData';
-import { collection, onSnapshot, query, orderBy, limit, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, where, limit } from 'firebase/firestore';
 import { db } from '@/firebase/firebase';
+import { useOrders } from './OrderContext';
 
 type SalesDataPoint = {
   date: string;
@@ -36,35 +36,73 @@ const StatsContext = createContext<StatsContextType | undefined>(undefined);
 
 // Provider component
 export function StatsProvider({ children }: { children: ReactNode }) {
-  const [salesData, setSalesData] = useState<SalesDataPoint[]>(MOCK_SALES_DATA);
-  const [topProducts, setTopProducts] = useState<TopProduct[]>(MOCK_TOP_PRODUCTS);
-  const [summary, setSummary] = useState<SalesSummary>(MOCK_SUMMARY);
+  const { orders } = useOrders();
+  const [salesData, setSalesData] = useState<SalesDataPoint[]>([]);
+  const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
+  const [summary, setSummary] = useState<SalesSummary>({
+    totalSales: 0,
+    totalOrders: 0,
+    averageOrderValue: 0,
+    salesGrowth: 0
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch sales data from Firestore
+  // Calculate sales data from delivered orders
   useEffect(() => {
-    const salesRef = collection(db, 'sales');
-    const salesQuery = query(salesRef, orderBy('date', 'desc'), limit(30));
-
-    const unsubscribeSales = onSnapshot(salesQuery, 
-      (snapshot) => {
-        const salesDataPoints = snapshot.docs.map(doc => ({
-          date: doc.data().date,
-          amount: doc.data().amount
-        })) as SalesDataPoint[];
-        setSalesData(salesDataPoints);
-        setIsLoading(false);
-      },
-      (error) => {
-        console.error('Error fetching sales data:', error);
-        setError('Failed to fetch sales data');
-        setIsLoading(false);
+    try {
+      const deliveredOrders = orders.filter(order => order.status === 'delivered');
+      
+      // Create sales data points from delivered orders
+      const salesPoints = deliveredOrders.map(order => ({
+        date: order.updatedAt,
+        amount: order.totalAmount
+      }));
+      
+      setSalesData(salesPoints);
+      
+      // Calculate summary
+      const totalSales = deliveredOrders.reduce((sum, order) => sum + order.totalAmount, 0);
+      const totalOrders = deliveredOrders.length;
+      const averageOrderValue = totalOrders > 0 ? totalSales / totalOrders : 0;
+      
+      // Calculate growth (comparing last 30 days with previous 30 days)
+      const now = new Date();
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+      
+      const recentOrders = deliveredOrders.filter(order => 
+        new Date(order.updatedAt) >= thirtyDaysAgo
+      );
+      const previousOrders = deliveredOrders.filter(order => 
+        new Date(order.updatedAt) >= sixtyDaysAgo && 
+        new Date(order.updatedAt) < thirtyDaysAgo
+      );
+      
+      const recentTotal = recentOrders.reduce((sum, order) => sum + order.totalAmount, 0);
+      const previousTotal = previousOrders.reduce((sum, order) => sum + order.totalAmount, 0);
+      
+      let salesGrowth = 0;
+      if (previousTotal > 0) {
+        salesGrowth = Math.round(((recentTotal - previousTotal) / previousTotal) * 100);
+      } else if (recentTotal > 0) {
+        salesGrowth = 100;
       }
-    );
-
-    return () => unsubscribeSales();
-  }, []);
+      
+      setSummary({
+        totalSales,
+        totalOrders,
+        averageOrderValue,
+        salesGrowth
+      });
+      
+      setIsLoading(false);
+    } catch (error) {
+      console.error('Error calculating stats:', error);
+      setError('Failed to calculate statistics');
+      setIsLoading(false);
+    }
+  }, [orders]);
 
   // Fetch top products from Firestore
   useEffect(() => {
@@ -94,27 +132,6 @@ export function StatsProvider({ children }: { children: ReactNode }) {
     );
 
     return () => unsubscribeTopProducts();
-  }, []);
-
-  // Fetch sales summary from Firestore
-  useEffect(() => {
-    const summaryRef = collection(db, 'stats');
-    const summaryQuery = query(summaryRef, limit(1));
-
-    const unsubscribeSummary = onSnapshot(summaryQuery,
-      (snapshot) => {
-        if (!snapshot.empty) {
-          const summaryData = snapshot.docs[0].data() as SalesSummary;
-          setSummary(summaryData);
-        }
-      },
-      (error) => {
-        console.error('Error fetching sales summary:', error);
-        setError('Failed to fetch sales summary');
-      }
-    );
-
-    return () => unsubscribeSummary();
   }, []);
 
   const value = {
