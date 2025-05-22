@@ -273,7 +273,7 @@ export default function LoginScreen() {
             </Animated.View>
 
             <TouchableOpacity style={styles.forgotPassword}>
-              <Link href="/auth/forgot-password">
+              <Link href="/forgot-password">
                 <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
               </Link>
             </TouchableOpacity>
