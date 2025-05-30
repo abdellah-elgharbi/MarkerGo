@@ -134,7 +134,7 @@ export default function ProductCard({ product, onEdit, onDelete, onAddToCart }: 
             
             <TouchableOpacity
               style={[styles.actionButton, { backgroundColor: colors.error }]}
-              onPress={handleDelete}
+              onPress={onDelete}
             >
               <Trash2 size={16} color="#FFFFFF" />
             </TouchableOpacity>

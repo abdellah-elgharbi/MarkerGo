@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, where, orderBy, limit, deleteDoc } from 'firebase/firestore';
 import { db } from '@/firebase/firebase';
 import { FirebaseErrorHandler } from './errorHandling';
 
@@ -126,6 +126,18 @@ export const searchProducts = async (searchQuery: string) => {
     }));
   } catch (error) {
     console.error('Error searching products:', error);
+    throw new Error(FirebaseErrorHandler.handleError(error));
+  }
+};
+
+// Delete a product by ID
+export const deleteProduct = async (id: string) => {
+  try {
+    const productRef = doc(db, 'products', id);
+    await deleteDoc(productRef);
+    return true;
+  } catch (error) {
+    console.error('Error deleting product:', error);
     throw new Error(FirebaseErrorHandler.handleError(error));
   }
 };
