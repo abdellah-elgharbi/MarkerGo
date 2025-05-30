@@ -3,10 +3,11 @@ import { useTheme } from '@/hooks/useTheme';
 import { useOrders } from '@/hooks/useOrders';
 import { MapPin, Phone, Mail } from 'lucide-react-native';
 import OrderStatusSelector from './OrderStatusSelector';
+import { Order } from '@/context/OrderContext';
 
 type OrderDetailsProps = {
-  order: ReturnType<typeof useOrders>['orders'][0];
-  onStatusChange: (status: ReturnType<typeof useOrders>['orders'][0]['status']) => void;
+  order: Order;
+  onStatusChange: (status: Order['status']) => void;
 };
 
 export default function OrderDetails({ order, onStatusChange }: OrderDetailsProps) {
@@ -40,7 +41,7 @@ export default function OrderDetails({ order, onStatusChange }: OrderDetailsProp
         
         <View style={styles.infoRow}>
           <Text style={[styles.infoLabel, { color: colors.textLight }]}>Date:</Text>
-          <Text style={[styles.infoValue, { color: colors.text }]}>{formatDate(order.date)}</Text>
+          <Text style={[styles.infoValue, { color: colors.text }]}>{formatDate(order.createdAt)}</Text>
         </View>
         
         <View style={styles.infoRow}>
@@ -60,58 +61,41 @@ export default function OrderDetails({ order, onStatusChange }: OrderDetailsProp
           <Text style={[styles.infoValue, { color: colors.text }]}>{order.customerName}</Text>
         </View>
         
-        <View style={styles.contactRow}>
-          <Mail size={16} color={colors.primary} />
-          <Text style={[styles.contactText, { color: colors.text }]}>{order.customerEmail}</Text>
+        <View style={styles.infoRow}>
+          <Text style={[styles.infoLabel, { color: colors.textLight }]}>Email:</Text>
+          <Text style={[styles.infoValue, { color: colors.text }]}>{order.customerEmail}</Text>
         </View>
         
-        <View style={styles.contactRow}>
-          <MapPin size={16} color={colors.primary} />
-          <Text style={[styles.contactText, { color: colors.text }]}>{order.shippingAddress}</Text>
-        </View>
+        {order.customerPhone && (
+          <View style={styles.infoRow}>
+            <Text style={[styles.infoLabel, { color: colors.textLight }]}>Phone:</Text>
+            <Text style={[styles.infoValue, { color: colors.text }]}>{order.customerPhone}</Text>
+          </View>
+        )}
       </View>
       
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Order Items</Text>
         
-        {order.items.map((item) => (
-          <View key={item.id} style={[styles.itemRow, { borderBottomColor: colors.border }]}>
-            {item.image && (
-              <Image source={{ uri: item.image }} style={styles.itemImage} />
-            )}
-            
+        {order.items.map((item, index) => (
+          <View key={item.id} style={styles.itemRow}>
             <View style={styles.itemInfo}>
-              <Text style={[styles.itemName, { color: colors.text }]}>{item.name}</Text>
-              <Text style={[styles.itemPrice, { color: colors.textLight }]}>
-                ${formatPrice(item.unitPrice)} × {item.quantity}
+              <Text style={[styles.itemName, { color: colors.text }]}>{item.productName}</Text>
+              <Text style={[styles.itemQuantity, { color: colors.textLight }]}>
+                Quantity: {item.quantity}
               </Text>
             </View>
-            
-            <Text style={[styles.itemTotal, { color: colors.primary }]}>
+            <Text style={[styles.itemPrice, { color: colors.text }]}>
               ${formatPrice(item.totalPrice)}
             </Text>
           </View>
         ))}
         
-        <View style={styles.totalsContainer}>
-          <View style={styles.totalRow}>
-            <Text style={[styles.totalLabel, { color: colors.textLight }]}>Subtotal:</Text>
-            <Text style={[styles.totalValue, { color: colors.text }]}>
-              ${formatPrice(order.totalAmount)}
-            </Text>
-          </View>
-          
-          <View style={styles.totalRow}>
-            <Text style={[styles.totalLabel, { color: colors.textLight }]}>Shipping:</Text>
-            <Text style={[styles.totalValue, { color: colors.text }]}>$0.00</Text>
-          </View>
-          
-          <View style={styles.totalRow}>
-            <Text style={[styles.grandTotalLabel, { color: colors.text }]}>Total:</Text>
-            <Text style={[styles.grandTotalValue, { color: colors.primary }]}>
-              ${formatPrice(order.totalAmount)}
-            </Text>
-          </View>
+        <View style={styles.totalRow}>
+          <Text style={[styles.totalLabel, { color: colors.text }]}>Total:</Text>
+          <Text style={[styles.totalAmount, { color: colors.primary }]}>
+            ${formatPrice(order.totalAmount)}
+          </Text>
         </View>
       </View>
     </View>
@@ -120,17 +104,16 @@ export default function OrderDetails({ order, onStatusChange }: OrderDetailsProp
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    gap: 16,
   },
   section: {
     borderRadius: 12,
     padding: 16,
-    marginBottom: 16,
     borderWidth: 1,
   },
   sectionTitle: {
     fontSize: 18,
-    fontFamily: 'Inter-SemiBold',
+    fontWeight: '600',
     marginBottom: 16,
   },
   infoRow: {
@@ -140,73 +123,48 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   infoLabel: {
-    fontSize: 15,
-    fontFamily: 'Inter-Regular',
+    fontSize: 14,
   },
   infoValue: {
-    fontSize: 15,
-    fontFamily: 'Inter-Medium',
-  },
-  contactRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  contactText: {
-    fontSize: 15,
-    fontFamily: 'Inter-Regular',
-    marginLeft: 12,
+    fontSize: 14,
+    fontWeight: '500',
   },
   itemRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-  },
-  itemImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 8,
+    marginBottom: 12,
   },
   itemInfo: {
     flex: 1,
-    marginLeft: 16,
   },
   itemName: {
-    fontSize: 16,
-    fontFamily: 'Inter-Medium',
+    fontSize: 14,
+    fontWeight: '500',
     marginBottom: 4,
+  },
+  itemQuantity: {
+    fontSize: 12,
   },
   itemPrice: {
     fontSize: 14,
-    fontFamily: 'Inter-Regular',
-  },
-  itemTotal: {
-    fontSize: 16,
-    fontFamily: 'Inter-SemiBold',
-  },
-  totalsContainer: {
-    marginTop: 16,
+    fontWeight: '500',
   },
   totalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    alignItems: 'center',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
   },
   totalLabel: {
-    fontSize: 15,
-    fontFamily: 'Inter-Regular',
+    fontSize: 16,
+    fontWeight: '600',
   },
-  totalValue: {
-    fontSize: 15,
-    fontFamily: 'Inter-Medium',
-  },
-  grandTotalLabel: {
+  totalAmount: {
     fontSize: 18,
-    fontFamily: 'Inter-SemiBold',
-  },
-  grandTotalValue: {
-    fontSize: 18,
-    fontFamily: 'Inter-SemiBold',
+    fontWeight: '700',
   },
 });

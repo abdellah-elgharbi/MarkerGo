@@ -28,6 +28,16 @@ export type Order = {
   shippingAddress: string;
 };
 
+type Product = {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  totalSold: number;
+  revenue: number;
+  image?: string;
+};
+
 type OrderContextType = {
   orders: Order[];
   isLoading: boolean;
@@ -65,26 +75,78 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       // If no orders exist, create a sample order
       if (existingOrders.length === 0) {
         console.log('No orders found, creating sample order...');
-        const sampleOrder = {
-          customerId: 'sample-customer',
-          customerName: 'Sample Customer',
-          customerEmail: 'sample@example.com',
-          customerPhone: '123-456-7890',
-          items: [{
-            id: 'item1',
-            productId: 'product1',
-            productName: 'Sample Product',
-            quantity: 1,
-            unitPrice: 1.00,
-            totalPrice: 1.00
-          }],
-          status: 'pending' as OrderStatus,
-          totalAmount: 1.00,
-          shippingAddress: '123 Sample St'
-        };
         
-        await createOrder(sampleOrder);
-        console.log('Sample order created');
+        // First, check if we have any products
+        const productsRef = collection(db, 'products');
+        const productsSnapshot = await getDocs(productsRef);
+        const products = productsSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Product[];
+        
+        console.log('Available products:', products);
+        
+        if (products.length === 0) {
+          console.log('No products found, creating a sample product first...');
+          const sampleProduct = {
+            name: 'Sample Product',
+            description: 'A sample product for testing',
+            price: 1.00,
+            totalSold: 0,
+            revenue: 0,
+            image: 'https://via.placeholder.com/150'
+          };
+          
+          const productRef = await addDoc(productsRef, sampleProduct);
+          console.log('Sample product created with Firebase ID:', productRef.id);
+          
+          // Create sample order with the new product
+          const sampleOrder = {
+            customerId: 'sample-customer',
+            customerName: 'Sample Customer',
+            customerEmail: 'sample@example.com',
+            customerPhone: '123-456-7890',
+            items: [{
+              id: productRef.id, // Use the product's Firebase ID
+              productId: productRef.id,
+              productName: 'Sample Product',
+              quantity: 1,
+              unitPrice: 1.00,
+              totalPrice: 1.00
+            }],
+            status: 'pending' as OrderStatus,
+            totalAmount: 1.00,
+            shippingAddress: '123 Sample St'
+          };
+          
+          const orderId = await createOrder(sampleOrder);
+          console.log('Sample order created with Firebase ID:', orderId);
+        } else {
+          // Use the first available product
+          const firstProduct = products[0];
+          console.log('Using existing product:', firstProduct);
+          
+          const sampleOrder = {
+            customerId: 'sample-customer',
+            customerName: 'Sample Customer',
+            customerEmail: 'sample@example.com',
+            customerPhone: '123-456-7890',
+            items: [{
+              id: firstProduct.id, // Use the product's Firebase ID
+              productId: firstProduct.id,
+              productName: firstProduct.name,
+              quantity: 1,
+              unitPrice: firstProduct.price,
+              totalPrice: firstProduct.price
+            }],
+            status: 'pending' as OrderStatus,
+            totalAmount: firstProduct.price,
+            shippingAddress: '123 Sample St'
+          };
+          
+          const orderId = await createOrder(sampleOrder);
+          console.log('Sample order created with Firebase ID:', orderId);
+        }
       }
       
       setIsLoading(false);
@@ -106,7 +168,10 @@ export function OrderProvider({ children }: { children: ReactNode }) {
           id: doc.id,
           ...doc.data()
         })) as Order[];
-        console.log('Orders updated from Firestore:', ordersData);
+        console.log('=== Orders Updated from Firestore ===');
+        console.log('Total orders:', ordersData.length);
+        console.log('Order IDs:', ordersData.map(order => order.id));
+        console.log('Full orders data:', JSON.stringify(ordersData, null, 2));
         setOrders(ordersData);
         setIsLoading(false);
       },
@@ -139,7 +204,9 @@ export function OrderProvider({ children }: { children: ReactNode }) {
         updatedAt: now
       };
       
+      // Let Firebase generate the ID
       const docRef = await addDoc(ordersRef, newOrder);
+      console.log('Created new order with Firebase ID:', docRef.id);
       return docRef.id;
     } catch (error) {
       console.error('Error creating order:', error);
@@ -152,15 +219,32 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       setIsLoading(true);
       setError(null);
       
-      console.log('Attempting to update order:', { id, status });
+      console.log('=== Starting Order Status Update ===');
+      console.log('Update request:', { id, status });
+      console.log('Current orders in state:', orders.map(order => ({ id: order.id, status: order.status })));
       
+      // First check if the order exists in our local state
+      const localOrder = orders.find(order => order.id === id);
+      console.log('Local order found:', localOrder ? 'Yes' : 'No');
+      if (localOrder) {
+        console.log('Local order details:', JSON.stringify(localOrder, null, 2));
+      }
+      
+      if (!localOrder) {
+        console.error('Order not found in local state:', id);
+        throw new Error(`Order not found in local state: ${id}`);
+      }
+      
+      // Use the Firestore document ID (which is the same as order.id)
       const orderRef = doc(db, 'orders', id);
+      console.log('Firestore document reference created:', orderRef.path);
       
-      // Check if order exists
+      // Check if order exists in Firestore
       const orderDoc = await getDoc(orderRef);
-      console.log('Order document exists:', orderDoc.exists());
+      console.log('Order document exists in Firestore:', orderDoc.exists());
       
       if (!orderDoc.exists()) {
+        console.error('Order not found in Firestore:', id);
         throw new Error(`Order not found in Firestore: ${id}`);
       }
       
@@ -172,17 +256,24 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       
       console.log('Updating order with data:', updateData);
       await updateDoc(orderRef, updateData);
-      console.log('Order updated in Firestore');
+      console.log('Order updated in Firestore successfully');
       
-      // Verify the update was successful
-      const updatedDoc = await getDoc(orderRef);
-      if (!updatedDoc.exists() || updatedDoc.data().status !== status) {
-        throw new Error('Order status update verification failed');
-      }
+      // Update local state
+      setOrders(prevOrders => {
+        const updatedOrders = prevOrders.map(order => 
+          order.id === id
+            ? { ...order, status, updatedAt: updateData.updatedAt }
+            : order
+        );
+        console.log('Local state updated:', updatedOrders.map(order => ({ id: order.id, status: order.status })));
+        return updatedOrders;
+      });
       
       setIsLoading(false);
+      console.log('=== Order Status Update Completed ===');
     } catch (error) {
-      console.error('Error updating order status:', error);
+      console.error('=== Error in Order Status Update ===');
+      console.error('Error details:', error);
       setError('Failed to update order status');
       setIsLoading(false);
       throw error;
