@@ -42,7 +42,7 @@ export default function OrderCard({ order, onStatusChange, isUpdating }: OrderCa
   
   const handlePress = () => {
     if (!isUpdating) {
-      router.push(`/orders/${order.id}`);
+      router.push(`/orders/${order.docId}`);
     }
   };
   
@@ -59,7 +59,7 @@ export default function OrderCard({ order, onStatusChange, isUpdating }: OrderCa
       <View style={styles.header}>
         <View>
           <Text style={[styles.orderId, { color: colors.textLight }]}>
-            Order #{order.id.slice(-6)}
+            Order #{order.docId.slice(-6)}
           </Text>
           <Text style={[styles.date, { color: colors.textLight }]}>
             {formatDate(order.createdAt)}

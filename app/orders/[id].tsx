@@ -7,7 +7,7 @@ import OrderDetails from '@/components/orders_/OrderDetails';
 import { Order, OrderStatus } from '@/context/OrderContext';
 
 export default function OrderDetailsScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id: docId } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { getOrderById, updateOrderStatus, orders } = useOrders();
   const [order, setOrder] = useState<Order | null>(null);
@@ -15,13 +15,13 @@ export default function OrderDetailsScreen() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (id) {
-      console.log('Fetching order with ID:', id);
-      console.log('Available orders:', orders.map(o => o.id));
+    if (docId) {
+      console.log('Fetching order with docId:', docId);
+      console.log('Available orders:', orders.map(o => o.docId));
       
-      const fetchedOrder = getOrderById(id);
+      const fetchedOrder = getOrderById(docId);
       if (!fetchedOrder) {
-        console.error('Order not found:', id);
+        console.error('Order not found:', docId);
         setError('Order not found');
         setLoading(false);
         return;
@@ -30,7 +30,7 @@ export default function OrderDetailsScreen() {
       setOrder(fetchedOrder);
       setLoading(false);
     }
-  }, [id, getOrderById, orders]);
+  }, [docId, getOrderById, orders]);
 
   const handleStatusChange = async (newStatus: OrderStatus) => {
     try {
@@ -38,8 +38,8 @@ export default function OrderDetailsScreen() {
         throw new Error('No order selected');
       }
       
-      console.log('Updating order status:', { orderId: order.id, newStatus });
-      await updateOrderStatus(order.id, newStatus);
+      console.log('Updating order status:', { docId: order.docId, newStatus });
+      await updateOrderStatus(order.docId, newStatus);
       setOrder(prev => prev ? { ...prev, status: newStatus } : null);
     } catch (error) {
       console.error('Failed to update order status:', error);

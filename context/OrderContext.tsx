@@ -15,7 +15,7 @@ export type OrderItem = {
 };
 
 export type Order = {
-  id: string;
+  docId: string;  // Firestore document ID
   customerId: string;
   customerName: string;
   customerEmail: string;
@@ -42,9 +42,9 @@ type OrderContextType = {
   orders: Order[];
   isLoading: boolean;
   error: string | null;
-  getOrderById: (id: string) => Order | null;
-  updateOrderStatus: (id: string, status: OrderStatus) => Promise<void>;
-  createOrder: (orderData: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string>;
+  getOrderById: (docId: string) => Order | null;
+  updateOrderStatus: (docId: string, status: OrderStatus) => Promise<void>;
+  createOrder: (orderData: Omit<Order, 'docId' | 'createdAt' | 'updatedAt'>) => Promise<string>;
   syncOrders: () => Promise<void>;
 };
 
@@ -66,7 +66,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       const ordersRef = collection(db, 'orders');
       const snapshot = await getDocs(ordersRef);
       const existingOrders = snapshot.docs.map(doc => ({
-        id: doc.id,
+        docId: doc.id,
         ...doc.data()
       })) as Order[];
       
@@ -107,7 +107,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
             customerEmail: 'sample@example.com',
             customerPhone: '123-456-7890',
             items: [{
-              id: productRef.id, // Use the product's Firebase ID
+              id: productRef.id,
               productId: productRef.id,
               productName: 'Sample Product',
               quantity: 1,
@@ -132,7 +132,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
             customerEmail: 'sample@example.com',
             customerPhone: '123-456-7890',
             items: [{
-              id: firstProduct.id, // Use the product's Firebase ID
+              id: firstProduct.id,
               productId: firstProduct.id,
               productName: firstProduct.name,
               quantity: 1,
@@ -165,12 +165,12 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     const unsubscribe = onSnapshot(ordersRef, 
       (snapshot) => {
         const ordersData = snapshot.docs.map(doc => ({
-          id: doc.id,
+          docId: doc.id, // Store the Firestore document ID separately
           ...doc.data()
-        })) as Order[];
+        })) as (Order & { docId: string })[];
         console.log('=== Orders Updated from Firestore ===');
         console.log('Total orders:', ordersData.length);
-        console.log('Order IDs:', ordersData.map(order => order.id));
+        console.log('Firestore Document IDs:', ordersData.map(order => order.docId));
         console.log('Full orders data:', JSON.stringify(ordersData, null, 2));
         setOrders(ordersData);
         setIsLoading(false);
@@ -189,11 +189,11 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, []);
 
-  const getOrderById = useCallback((id: string) => {
-    return orders.find(order => order.id === id) || null;
+  const getOrderById = useCallback((docId: string) => {
+    return orders.find(order => order.docId === docId) || null;
   }, [orders]);
 
-  const createOrder = async (orderData: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
+  const createOrder = async (orderData: Omit<Order, 'docId' | 'createdAt' | 'updatedAt'>): Promise<string> => {
     try {
       const ordersRef = collection(db, 'orders');
       const now = new Date().toISOString();
@@ -204,7 +204,6 @@ export function OrderProvider({ children }: { children: ReactNode }) {
         updatedAt: now
       };
       
-      // Let Firebase generate the ID
       const docRef = await addDoc(ordersRef, newOrder);
       console.log('Created new order with Firebase ID:', docRef.id);
       return docRef.id;
@@ -214,29 +213,29 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const updateOrderStatus = async (id: string, status: OrderStatus): Promise<void> => {
+  const updateOrderStatus = async (docId: string, status: OrderStatus): Promise<void> => {
     try {
       setIsLoading(true);
       setError(null);
       
       console.log('=== Starting Order Status Update ===');
-      console.log('Update request:', { id, status });
-      console.log('Current orders in state:', orders.map(order => ({ id: order.id, status: order.status })));
+      console.log('Update request:', { docId, status });
+      console.log('Current orders in state:', orders.map(order => ({ docId: order.docId, status: order.status })));
       
-      // First check if the order exists in our local state
-      const localOrder = orders.find(order => order.id === id);
+      // First check if the order exists in our local state using docId
+      const localOrder = orders.find(order => order.docId === docId);
       console.log('Local order found:', localOrder ? 'Yes' : 'No');
       if (localOrder) {
         console.log('Local order details:', JSON.stringify(localOrder, null, 2));
       }
       
       if (!localOrder) {
-        console.error('Order not found in local state:', id);
-        throw new Error(`Order not found in local state: ${id}`);
+        console.error('Order not found in local state:', docId);
+        throw new Error(`Order not found in local state: ${docId}`);
       }
       
-      // Use the Firestore document ID (which is the same as order.id)
-      const orderRef = doc(db, 'orders', id);
+      // Use the Firestore document ID directly
+      const orderRef = doc(db, 'orders', docId);
       console.log('Firestore document reference created:', orderRef.path);
       
       // Check if order exists in Firestore
@@ -244,8 +243,8 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       console.log('Order document exists in Firestore:', orderDoc.exists());
       
       if (!orderDoc.exists()) {
-        console.error('Order not found in Firestore:', id);
-        throw new Error(`Order not found in Firestore: ${id}`);
+        console.error('Order not found in Firestore:', docId);
+        throw new Error(`Order not found in Firestore: ${docId}`);
       }
       
       // Order exists, update it
@@ -258,14 +257,14 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       await updateDoc(orderRef, updateData);
       console.log('Order updated in Firestore successfully');
       
-      // Update local state
+      // Update local state using docId
       setOrders(prevOrders => {
         const updatedOrders = prevOrders.map(order => 
-          order.id === id
+          order.docId === docId
             ? { ...order, status, updatedAt: updateData.updatedAt }
             : order
         );
-        console.log('Local state updated:', updatedOrders.map(order => ({ id: order.id, status: order.status })));
+        console.log('Local state updated:', updatedOrders.map(order => ({ docId: order.docId, status: order.status })));
         return updatedOrders;
       });
       

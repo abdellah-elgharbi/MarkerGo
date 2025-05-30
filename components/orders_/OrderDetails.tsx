@@ -36,7 +36,7 @@ export default function OrderDetails({ order, onStatusChange }: OrderDetailsProp
         
         <View style={styles.infoRow}>
           <Text style={[styles.infoLabel, { color: colors.textLight }]}>Order ID:</Text>
-          <Text style={[styles.infoValue, { color: colors.text }]}>#{order.id}</Text>
+          <Text style={[styles.infoValue, { color: colors.text }]}>#{order.docId}</Text>
         </View>
         
         <View style={styles.infoRow}>
