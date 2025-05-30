@@ -1,20 +1,20 @@
-import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useState, useEffect } from 'react';
 import { useCart } from '@/hooks/useCart';
-import { fetchProductById } from '@/utils/api';
+import { fetchProductById, deleteProduct, Product } from '@/utils/api';
 import { Button } from '@/components/ui/Button';
-import { ArrowLeft, ShoppingCart, Star, Truck as TruckIcon, Plus, Minus, ChevronDown } from 'lucide-react-native';
+import { ArrowLeft, ShoppingCart, Star, Truck as TruckIcon, Plus, Minus, ChevronDown, Trash2 } from 'lucide-react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams();
-  const [product, setProduct] = useState(null);
+  const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
-  const [selectedVariant, setSelectedVariant] = useState(null);
-  const [expandedSection, setExpandedSection] = useState('description');
+  const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
+  const [expandedSection, setExpandedSection] = useState<string>('description');
   const { addItem } = useCart();
 
   useEffect(() => {
@@ -48,18 +48,44 @@ export default function ProductDetailScreen() {
   const handleAddToCart = () => {
     if (product) {
       addItem({
-        ...product,
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        image: product.image,
         quantity,
         selectedVariant,
       });
-      
-      // Reset quantity after adding to cart
       setQuantity(1);
     }
   };
 
-  const toggleSection = (section) => {
-    setExpandedSection(expandedSection === section ? null : section);
+  const handleDeleteProduct = async () => {
+    Alert.alert(
+      "Supprimer le produit",
+      "Êtes-vous sûr de vouloir supprimer ce produit ?",
+      [
+        {
+          text: "Annuler",
+          style: "cancel"
+        },
+        {
+          text: "Supprimer",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteProduct(id as string);
+              router.replace('/');
+            } catch (error) {
+              Alert.alert("Erreur", "Impossible de supprimer le produit. Veuillez réessayer.");
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const toggleSection = (section: string) => {
+    setExpandedSection(expandedSection === section ? '' : section);
   };
 
   if (loading || !product) {
@@ -134,7 +160,7 @@ export default function ProductDetailScreen() {
             <View style={styles.variantsContainer}>
               <Text style={styles.variantsTitle}>Variants:</Text>
               <View style={styles.variantButtons}>
-                {product.variants.map((variant, index) => (
+                {product.variants.map((variant: string, index: number) => (
                   <TouchableOpacity
                     key={index}
                     style={[
@@ -221,6 +247,13 @@ export default function ProductDetailScreen() {
           onPress={handleAddToCart}
           icon={<ShoppingCart size={20} color="#FFFFFF" />}
         />
+        <TouchableOpacity 
+          style={styles.deleteButton}
+          onPress={handleDeleteProduct}
+        >
+          <Trash2 size={20} color="#FF5252" />
+          <Text style={styles.deleteButtonText}>Supprimer</Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
@@ -434,5 +467,21 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderTopWidth: 1,
     borderTopColor: '#ECEFF1',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#FFEBEE',
+  },
+  deleteButtonText: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 16,
+    color: '#FF5252',
+    marginLeft: 8,
   },
 });
