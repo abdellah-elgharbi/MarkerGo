@@ -1,11 +1,11 @@
-import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useState, useEffect } from 'react';
 import { useCart } from '@/hooks/useCart';
-import { fetchProductById, deleteProduct, Product } from '@/utils/api';
+import { fetchProductById, Product } from '@/utils/api';
 import { Button } from '@/components/ui/Button';
-import { ArrowLeft, ShoppingCart, Star, Truck as TruckIcon, Plus, Minus, ChevronDown, Trash2 } from 'lucide-react-native';
+import { ArrowLeft, ShoppingCart, Star, Truck as TruckIcon, Plus, Minus, ChevronDown } from 'lucide-react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 export default function ProductDetailScreen() {
@@ -57,31 +57,6 @@ export default function ProductDetailScreen() {
       });
       setQuantity(1);
     }
-  };
-
-  const handleDeleteProduct = async () => {
-    Alert.alert(
-      "Supprimer le produit",
-      "Êtes-vous sûr de vouloir supprimer ce produit ?",
-      [
-        {
-          text: "Annuler",
-          style: "cancel"
-        },
-        {
-          text: "Supprimer",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await deleteProduct(id as string);
-              router.replace('/');
-            } catch (error) {
-              Alert.alert("Erreur", "Impossible de supprimer le produit. Veuillez réessayer.");
-            }
-          }
-        }
-      ]
-    );
   };
 
   const toggleSection = (section: string) => {
@@ -247,13 +222,6 @@ export default function ProductDetailScreen() {
           onPress={handleAddToCart}
           icon={<ShoppingCart size={20} color="#FFFFFF" />}
         />
-        <TouchableOpacity 
-          style={styles.deleteButton}
-          onPress={handleDeleteProduct}
-        >
-          <Trash2 size={20} color="#FF5252" />
-          <Text style={styles.deleteButtonText}>Supprimer</Text>
-        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
@@ -467,21 +435,5 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderTopWidth: 1,
     borderTopColor: '#ECEFF1',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  deleteButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 8,
-    backgroundColor: '#FFEBEE',
-  },
-  deleteButtonText: {
-    fontFamily: 'Inter-Medium',
-    fontSize: 16,
-    color: '#FF5252',
-    marginLeft: 8,
   },
 });
