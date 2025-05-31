@@ -1,99 +1,110 @@
-# MarkerGo
+# MarketGo
 
-MarkerGo is a shop application designed to make it easy for users to sell and buy items. Built with React Native and Expo, MarkerGo provides a cross-platform experience and leverages modern libraries for seamless navigation, Firebase integration, and more.
+MarketGo est une application mobile moderne développée avec Expo et React Native, offrant une expérience utilisateur fluide et intuitive pour la gestion et la découverte de marchés.
 
-## Project Purpose
+## 🚀 Technologies Utilisées
 
-MarkerGo is a simple marketplace app that allows users to:
-- List items for sale
-- Browse and purchase items from other users
+- **Expo** (v53.0.4) - Framework pour le développement d'applications React Native
+- **React Native** (v0.79.1) - Framework mobile cross-platform
+- **TypeScript** - Pour un développement plus robuste et maintenable
+- **NativeWind** - Pour le styling avec Tailwind CSS
+- **Zustand** - Pour la gestion d'état
+- **Expo Router** - Pour la navigation
+- **Expo Vector Icons** - Pour les icônes
+- **Expo Location** - Pour les fonctionnalités de géolocalisation
+- **Expo Image Picker** - Pour la gestion des images
+- **Async Storage** - Pour le stockage local
 
-## Features
+## 📋 Prérequis
 
-- Sell products: Easily list items you want to sell.
-- Buy products: Browse available items and make purchases.
-- Built with React Native and Expo for cross-platform support.
-- Uses Expo Router for smooth navigation.
-- Firebase integration for backend and data storage.
+- Node.js (version recommandée : LTS)
+- npm ou yarn
+- Expo CLI
+- Un appareil mobile ou un émulateur pour le test
 
-## Project Structure
+## 🛠 Installation
 
-```
-.
-├── android/              # Android native files
-├── app/                  # Main application source
-├── assets/               # Images and static assets
-├── components/           # React Native components
-├── context/              # Context providers (state management)
-├── data/                 # Data files or modules
-├── firebase/             # Firebase configuration and hooks
-├── hooks/                # Custom React hooks
-├── utils/                # Utility functions
-├── .bolt/                # Bolt configuration (if used)
-├── .gitignore
-├── .npmrc
-├── .prettierrc
-├── app.json              # Expo app configuration
-├── package.json          # Project manifest and dependencies
-├── package-lock.json
-├── tsconfig.json         # TypeScript configuration
-└── context.rar           # (Possibly an archive of context files)
+1. Clonez le repository :
+```bash
+git clone [URL_DU_REPO]
+cd marketGo
 ```
 
-## Getting Started
-
-### Prerequisites
-
-- Node.js & npm
-- Expo CLI (`npm install -g expo-cli`)
-
-### Install Dependencies
-
+2. Installez les dépendances :
 ```bash
 npm install
+# ou
+yarn install
 ```
 
-### Run the App
-
+3. Lancez l'application :
 ```bash
-npm run dev
+# Pour le développement mobile
+npm run start
+# ou
+yarn start
+
+# Pour le développement web
+npm run start-web
+# ou
+yarn start-web
 ```
 
-### Build for Web
+## 🏗 Structure du Projet
 
-```bash
-npm run build:web
+```
+marketGo/
+├── app/              # Pages et routes de l'application
+├── assets/           # Images, fonts et autres ressources
+├── components/       # Composants réutilisables
+├── constants/        # Constantes et configurations
+├── services/         # Services et API
+├── stores/          # État global (Zustand)
+└── types/           # Types TypeScript
 ```
 
-## Scripts
+## 🚀 Scripts Disponibles
 
-- `dev` - Start Expo development server
-- `build:web` - Export app for web
-- `lint` - Lint the project using Expo
+- `npm start` : Lance l'application en mode développement mobile
+- `npm run start-web` : Lance l'application en mode web
+- `npm run start-web-dev` : Lance l'application en mode web avec le debug activé
 
-## Dependencies
+## 🔧 Configuration
 
-MarkerGo leverages a variety of popular libraries, including:
+Le projet utilise plusieurs fichiers de configuration :
+- `babel.config.js` : Configuration de Babel
+- `tsconfig.json` : Configuration TypeScript
+- `webpack.config.js` : Configuration Webpack
+- `metro.config.js` : Configuration Metro bundler
+- `app.json` : Configuration Expo
 
-- React Native
-- Expo (with plugins: fonts, haptics, camera, etc.)
-- Firebase
-- Lucide React Native
-- Expo Router
-- React Navigation
-- Chart Kit
+## 📱 Fonctionnalités
 
-See [`package.json`](./package.json) for the full list.
+- Interface utilisateur moderne et responsive
+- Navigation fluide avec Expo Router
+- Gestion d'état avec Zustand
+- Support du stockage local
+- Intégration de la géolocalisation
+- Gestion des images
+- Support multi-plateforme (iOS, Android, Web)
 
-## Configuration
+## 🤝 Contribution
 
-- App configuration is in [`app.json`](./app.json).
-- TypeScript configuration is in [`tsconfig.json`](./tsconfig.json).
+Les contributions sont les bienvenues ! N'hésitez pas à :
+1. Fork le projet
+2. Créer une branche pour votre fonctionnalité
+3. Commiter vos changements
+4. Pousser vers la branche
+5. Ouvrir une Pull Request
 
-## License
+## 📄 Licence
 
-Specify your license here.
+Ce projet est sous licence privée. Tous droits réservés.
 
----
+## 👥 Auteurs
 
-> **Note**: This README is generated based on the detected project structure and available files. For more details, visit the [repository](https://github.com/abdellah-elgharbi/MarkerGo).
+- [Votre Nom] - Développeur principal
+
+## 📞 Support
+
+Pour toute question ou problème, veuillez ouvrir une issue dans le repository. 
