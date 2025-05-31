@@ -26,7 +26,7 @@ MarketGo est une application mobile moderne développée avec Expo et React Nati
 
 1. Clonez le repository :
 ```bash
-git clone [URL_DU_REPO]
+git clone https://github.com/abdellah-elgharbi/MarkerGo
 cd marketGo
 ```
 
