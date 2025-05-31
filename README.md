@@ -103,7 +103,10 @@ Ce projet est sous licence privée. Tous droits réservés.
 
 ## 👥 Auteurs
 
-- [Votre Nom] - Développeur principal
+- EL MASKYNE MOHAMED AMINE
+- EL GHARBI ABDELLAH 
+- AIT OUHADA YOUNESS
+- HARATI AYOUB
 
 ## 📞 Support
 
